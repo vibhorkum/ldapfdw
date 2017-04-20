@@ -1,0 +1,102 @@
+CREATE EXTENSION ldap_fdw;
+CREATE SERVER ldap_test_server
+FOREIGN DATA WRAPPER ldap_fdw
+OPTIONS ( address 'localhost', port '389');
+CREATE USER MAPPING FOR current_user
+SERVER ldap_test_server
+OPTIONS (user_dn 'cn=admin,dc=guedesoft,dc=net', password 'ldap');
+CREATE FOREIGN TABLE ldap_people (
+   dn text,
+   object_body text
+)
+SERVER ldap_test_server
+OPTIONS (base_dn 'ou=people,dc=guedesoft,dc=net');
+CREATE FOREIGN TABLE ldap_john_smith (
+   dn text,
+   object_body text
+)
+SERVER ldap_test_server
+OPTIONS (base_dn 'ou=people,dc=guedesoft,dc=net', query '(cn=John Smith)');
+SELECT * FROM ldap_people WHERE dn = 'cn=admin';
+ dn | object_body 
+----+-------------
+(0 rows)
+
+SELECT object_body FROM ldap_people WHERE dn = 'cn=Dickson Guedes';
+                          object_body                           
+----------------------------------------------------------------
+ cn => "Dickson Guedes",                                       +
+ gidNumber => "500",                                           +
+ homeDirectory => "/home/users/guedes",                        +
+ sn => "Guedes",                                               +
+ loginShell => "/bin/sh",                                      +
+ objectClass => "{\"inetOrgPerson\",\"posixAccount\",\"top\"}",+
+ userPassword => "ldap",                                       +
+ uidNumber => "1000",                                          +
+ uid => "guedes",                                              +
+ givenName => "{\"Dickson, Guedes\",\"Gueduxo\"}",             +
+ 
+(1 row)
+
+SELECT * FROM ldap_people;
+                       dn                        |                          object_body                           
+-------------------------------------------------+----------------------------------------------------------------
+ cn=Dickson Guedes,ou=people,dc=guedesoft,dc=net | cn => "Dickson Guedes",                                       +
+                                                 | gidNumber => "500",                                           +
+                                                 | homeDirectory => "/home/users/guedes",                        +
+                                                 | sn => "Guedes",                                               +
+                                                 | loginShell => "/bin/sh",                                      +
+                                                 | objectClass => "{\"inetOrgPerson\",\"posixAccount\",\"top\"}",+
+                                                 | userPassword => "ldap",                                       +
+                                                 | uidNumber => "1000",                                          +
+                                                 | uid => "guedes",                                              +
+                                                 | givenName => "{\"Dickson, Guedes\",\"Gueduxo\"}",             +
+                                                 | 
+ cn=John Smith,ou=people,dc=guedesoft,dc=net     | gidNumber => "500",                                           +
+                                                 | loginShell => "/bin/sh",                                      +
+                                                 | objectClass => "{\"inetOrgPerson\",\"posixAccount\",\"top\"}",+
+                                                 | uidNumber => "1001",                                          +
+                                                 | cn => "John Smith",                                           +
+                                                 | givenName => "John",                                          +
+                                                 | homeDirectory => "/home/users/jsmith",                        +
+                                                 | sn => "Smith",                                                +
+                                                 | uid => "jsmith",                                              +
+                                                 | userPassword => "{SSHA}mbmIECN8SEUv21FrXxt2Z8Qy7p/LE0EF",     +
+                                                 | 
+(2 rows)
+
+SELECT * FROM ldap_john_smith;
+                     dn                      |                          object_body                           
+---------------------------------------------+----------------------------------------------------------------
+ cn=John Smith,ou=people,dc=guedesoft,dc=net | gidNumber => "500",                                           +
+                                             | loginShell => "/bin/sh",                                      +
+                                             | objectClass => "{\"inetOrgPerson\",\"posixAccount\",\"top\"}",+
+                                             | uidNumber => "1001",                                          +
+                                             | cn => "John Smith",                                           +
+                                             | givenName => "John",                                          +
+                                             | homeDirectory => "/home/users/jsmith",                        +
+                                             | sn => "Smith",                                                +
+                                             | uid => "jsmith",                                              +
+                                             | userPassword => "{SSHA}mbmIECN8SEUv21FrXxt2Z8Qy7p/LE0EF",     +
+                                             | 
+(1 row)
+
+ALTER FOREIGN TABLE ldap_john_smith
+OPTIONS ( ADD attributes 'gidNumber,uidNumber,homeDirectory,nonExistant' );
+SELECT * FROM ldap_john_smith;
+                     dn                      |              object_body               
+---------------------------------------------+----------------------------------------
+ cn=John Smith,ou=people,dc=guedesoft,dc=net | gidNumber => "500",                   +
+                                             | uidNumber => "1001",                  +
+                                             | homeDirectory => "/home/users/jsmith",+
+                                             | 
+(1 row)
+
+EXPLAIN SELECT * FROM ldap_john_smith;
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Foreign Scan on ldap_john_smith  (cost=10.00..510.00 rows=500 width=64)
+   Foreign Ldap: ldap
+   Foreign Ldap cost: 10
+(3 rows)
+
